@@ -1,0 +1,5 @@
+.services-db
+.vscode
+.cache
+.modcache
+tmp

@@ -19,7 +19,7 @@ func New(mux *http.ServeMux, addr string) *http.Server {
 func ErrorResponse(w http.ResponseWriter, code int, err error) {
 	slog.Error("Error response", "err", err, "code", code)
 	w.WriteHeader(code)
-	output := struc {
+	output := struct {
 		Error string `json:"error"`
 	}{
 		Error: err.Error(),

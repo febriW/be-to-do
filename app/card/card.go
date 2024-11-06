@@ -3,7 +3,9 @@ package card
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/febriW/be-to-do/repository"
 	"github.com/febriW/be-to-do/server"
 	"net/http"
@@ -27,6 +29,13 @@ type Card struct {
 	DeletedAt    time.Time
 }
 
+type CardParamCreate struct {
+	AuthorID int       `json:"author_id"`
+	Title    string    `json:"title"`
+	Content  string    `json:"content"`
+	Marked   time.Time `json:"marked"`
+}
+
 type CardsParam struct {
 	AuthorID int
 	PaginationParam
@@ -43,6 +52,41 @@ type Service struct {
 
 func NewService(db *sql.DB) *Service {
 	return &Service{db: db}
+}
+
+func (s *Service) CreateCard(ctx context.Context, params CardParamCreate) error {
+	err := s.execTx(ctx, func(r *repository.Repository) error {
+		if params.AuthorID <= 0 {
+			return fmt.Errorf("author id %s %w", strconv.Itoa(params.AuthorID), ErrNotFound)
+		}
+		return r.CreateCard(ctx, repository.Card{
+			AuthorID: params.AuthorID,
+			Title:    params.Title,
+			Content:  params.Content,
+			Marked:   params.Marked,
+		})
+	})
+
+	return err
+}
+
+func (s *Service) HandleCreateCard() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input CardParamCreate
+		err := json.NewDecoder(r.Body).Decode(&input)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		err = s.CreateCard(r.Context(), input)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 func (s *Service) GetAllCards(ctx context.Context, param CardsParam) ([]Card, int) {
@@ -122,6 +166,23 @@ func (s *Service) HandleGetAllCards() func(http.ResponseWriter, *http.Request) {
 		}
 		server.JSONResponse(w, http.StatusOK, output)
 	}
+}
+
+func (s *Service) execTx(ctx context.Context, fn func(*repository.Repository) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	repo := repository.New(tx)
+	err = fn(repo)
+	if err != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+		}
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func mapCardRepoToService(data repository.Card) Card {

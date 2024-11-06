@@ -33,7 +33,7 @@ type Card struct {
 	ActivitiesNo string `json:"activities_no"`
 	Title        string `json:"title"`
 	Content      string `json:"content"`
-	AuthorId     int    `json:"author_id"`
+	AuthorID     int    `json:"author_id"`
 	Marked       time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -83,26 +83,21 @@ func (r *Repository) CreateUser(ctx context.Context, data User) error {
 	return err
 }
 
-
-activities_no VARCHAR(10) NOT NULL PRIMARY KEY,
-author_id INT NOT NULL,
-title VARCHAR(100) NOT NULL,
-content TEXT  NOT NULL,
-marked TIMESTAMP NULL,
-created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-deleted_at TIMESTAMP NULL
-
-
 // card repository
 func (r *Repository) CreateCard(ctx context.Context, data Card) error {
-	selectQuery := r.SelectQuery("SELECT activities_no FROM card")
-	latestActivities := r.Count(ctx,selectQuery)
+	selectQuery := r.SelectQuery("SELECT * FROM card")
+	latestActivities := r.Count(ctx, selectQuery)
+	if latestActivities == 0 {
+		latestActivities = 1
+	} else {
+		latestActivities += 1
+	}
 	activitiesNo := fmt.Sprintf("AC-%04d", latestActivities)
-
-	query := `INSET INTO card (activities_no, author_id, title, content) VALUES (?,?,?,?)`
-	_, err := r.db.ExecContext(ctx, query, activitiesNo, data.AuthorId, data.Title, data.Content)
-	if err != nil { return err}
+	query := `INSERT INTO card (activities_no, author_id, title, content) VALUES (?,?,?,?)`
+	_, err := r.db.ExecContext(ctx, query, activitiesNo, data.AuthorID, data.Title, data.Content)
+	if err != nil {
+		return err
+	}
 	return err
 }
 

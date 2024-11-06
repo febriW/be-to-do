@@ -83,7 +83,29 @@ func (r *Repository) CreateUser(ctx context.Context, data User) error {
 	return err
 }
 
+
+activities_no VARCHAR(10) NOT NULL PRIMARY KEY,
+author_id INT NOT NULL,
+title VARCHAR(100) NOT NULL,
+content TEXT  NOT NULL,
+marked TIMESTAMP NULL,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+deleted_at TIMESTAMP NULL
+
+
 // card repository
+func (r *Repository) CreateCard(ctx context.Context, data Card) error {
+	selectQuery := r.SelectQuery("SELECT activities_no FROM card")
+	latestActivities := r.Count(ctx,selectQuery)
+	activitiesNo := fmt.Sprintf("AC-%04d", latestActivities)
+
+	query := `INSET INTO card (activities_no, author_id, title, content) VALUES (?,?,?,?)`
+	_, err := r.db.ExecContext(ctx, query, activitiesNo, data.AuthorId, data.Title, data.Content)
+	if err != nil { return err}
+	return err
+}
+
 func (r *Repository) GetCards(ctx context.Context, param CardsParam) ([]Card, int) {
 	if param.Page <= 0 {
 		param.Page = 1
@@ -122,7 +144,7 @@ func (r *Repository) SelectQuery(query string) string {
 	return query
 }
 
-func (r *Repository) paginationQuery(query string, param PaginationParam) string {
+func (r *Repository) paginationQuery(query string, param PaginationParams) string {
 	limit := param.Size
 	offset := (param.Page - 1) * param.Size
 

@@ -37,7 +37,7 @@ func (s *Service) Register(ctx context.Context, name, email, password string) er
 	err := s.execTx(ctx, func(r *repository.Repository) error {
 		u := r.CheckUser(ctx, email)
 		if u != nil {
-			return fmt.Errorf("email %s already exists", email, ErrAlreadyRegistered)
+			return fmt.Errorf("email %s %w", email, ErrAlreadyRegistered)
 		}
 
 		passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

@@ -45,7 +45,7 @@ func NewService(db *sql.DB) *Service {
 	return &Service{db: db}
 }
 
-func (s *Service) GetAllCards(ctx context.Context, param *GetsParam) ([]Card, int) {
+func (s *Service) GetAllCards(ctx context.Context, param CardsParam) ([]Card, int) {
 	repo := repository.New(s.db)
 	repoParam := repository.CardsParam{
 		AuthorID: param.AuthorID,
@@ -67,12 +67,14 @@ func (s *Service) HandleGetAllCards() func(http.ResponseWriter, *http.Request) {
 		urlParams := r.URL.Query()
 		var errs []error
 
-		authorIDStr	:= urlParams.Get("author_id")
+		authorIDStr := urlParams.Get("author_id")
 		authorID := 0
 		if authorIDStr != "" {
 			var err error
 			authorID, err = strconv.Atoi(authorIDStr)
-			if err != nil { errs = append(errs, err) }
+			if err != nil {
+				errs = append(errs, err)
+			}
 		}
 
 		pageStr := urlParams.Get("page")
@@ -80,7 +82,9 @@ func (s *Service) HandleGetAllCards() func(http.ResponseWriter, *http.Request) {
 		if pageStr != "" {
 			var err error
 			page, err = strconv.Atoi(pageStr)
-			if err != nil { errs = append(errs, err) }
+			if err != nil {
+				errs = append(errs, err)
+			}
 		}
 
 		sizeStr := urlParams.Get("size")
@@ -88,31 +92,33 @@ func (s *Service) HandleGetAllCards() func(http.ResponseWriter, *http.Request) {
 		if sizeStr != "" {
 			var err error
 			size, err = strconv.Atoi(sizeStr)
-			if err != nil { errs = append(errs, err) }
+			if err != nil {
+				errs = append(errs, err)
+			}
 		}
 
 		if len(errs) > 0 {
-			server.ErrorResponse(w, http.StatusBadRequest, errors.Join(err...))
+			server.ErrorResponse(w, http.StatusBadRequest, errors.Join(errs...))
 			return
 		}
 
-		params := &CardsParam{
+		params := CardsParam{
 			AuthorID: authorID,
 			PaginationParam: PaginationParam{
 				Page: page,
 				Size: size,
-			}
+			},
 		}
 
 		cs, total := s.GetAllCards(r.Context(), params)
 		output := struct {
-			Next string
-			Prev string
+			Next  string
+			Prev  string
 			Total int
-			Data []Card
+			Data  []Card
 		}{
 			Total: total,
-			Data: cs
+			Data:  cs,
 		}
 		server.JSONResponse(w, http.StatusOK, output)
 	}

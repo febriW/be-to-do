@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/febriW/be-to-do/repository"
 	"github.com/febriW/be-to-do/server"
+	"github.com/febriW/be-to-do/session"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 )
@@ -19,9 +20,9 @@ var (
 )
 
 type User struct {
-	Name     string
-	Email    string
-	Password string
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type Service struct {
@@ -75,6 +76,50 @@ func (s *Service) HandleRegister() func(w http.ResponseWriter, r *http.Request) 
 		}
 
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (s *Service) Login(ctx context.Context, email, password string) (string, error) {
+	repo := repository.New(s.db)
+	u := repo.CheckUser(ctx, email)
+	if u == nil {
+		return "", fmt.Errorf("user with email %s: %w", email, ErrNotFound)
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
+		return "", fmt.Errorf("user password not match: %w", ErrInvalidLogin)
+	}
+
+	token := session.Create(u.ID)
+	return token, nil
+}
+
+func (s *Service) HandleLogin() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
+
+		err := json.NewDecoder(r.Body).Decode(&input)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		token, err := s.Login(r.Context(), input.Email, input.Password)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+
+		output := struct {
+			Token string `json:"token"`
+		}{
+			Token: token,
+		}
+
+		server.JSONResponse(w, http.StatusOK, output)
 	}
 }
 

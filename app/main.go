@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/febriW/be-to-do/card"
 	"github.com/febriW/be-to-do/user"
 	"log"
 	"net/http"
@@ -21,10 +22,14 @@ func NotImplemented(w http.ResponseWriter, r *http.Request) {
 func main() {
 	db := initDB()
 	userService := user.NewService(db)
+	cardService := card.NewService(db)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", NotImplemented)
+	mux.HandleFunc("GET /", NotImplemented)
 	mux.HandleFunc("POST /user/register", userService.HandleRegister())
+	mux.HandleFunc("POST /auth/login", userService.HandleLogin())
+
+	mux.HandleFunc("GET /card", user.TokenMiddleware(cardService.HandleGetAllCards()))
 
 	srv := &http.Server{
 		Handler:      mux,

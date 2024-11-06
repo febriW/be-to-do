@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/georgysavva/scany/v2/dbscan"
 	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -28,10 +29,32 @@ type User struct {
 	UpdatedAt    time.Time
 }
 
+type Card struct {
+	ActivitiesNo string `json:"activities_no"`
+	Title        string `json:"title"`
+	Content      string `json:"content"`
+	AuthorId     int    `json:"author_id"`
+	Marked       time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    time.Time
+}
+
+type CardsParam struct {
+	AuthorID int
+	PaginationParams
+}
+
+type PaginationParams struct {
+	Page int
+	Size int
+}
+
 func New(db DB) *Repository {
 	return &Repository{db: db}
 }
 
+// repository user
 func (r *Repository) CheckUser(ctx context.Context, email string) *User {
 	query := r.SelectQuery(`SELECT * FROM user WHERE email = ? LIMIT 1`)
 	rows, err := r.db.QueryContext(ctx, query, email)
@@ -51,6 +74,46 @@ func (r *Repository) CheckUser(ctx context.Context, email string) *User {
 	return &res
 }
 
+func (r *Repository) CreateUser(ctx context.Context, data User) error {
+	query := `INSERT INTO user (name, email, password_hash) VALUES (?, ?, ?)`
+	_, err := r.db.ExecContext(ctx, query, data.Name, data.Email, data.PasswordHash)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+// card repository
+func (r *Repository) GetCards(ctx context.Context, param CardsParam) ([]Card, int) {
+	if param.Page <= 0 {
+		param.Page = 1
+	}
+
+	if param.Size <= 0 {
+		param.Size = 10
+	}
+
+	query := r.SelectQuery("SELECT * FROM card")
+	var args []any
+
+	if param.AuthorID > 0 {
+		query += " WHERE author_id = ?"
+		args = append(args, param.AuthorID)
+	}
+
+	total := r.Count(ctx, query, args...)
+	query = r.paginationQuery(query, param.PaginationParams)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0
+	}
+
+	var res []Card
+	dbscan.ScanAll(&res, rows)
+	return res, total
+}
+
+// common func
 func (r *Repository) SelectQuery(query string) string {
 	if r.ForUpdate {
 		query += " FOR UPDATE"
@@ -59,11 +122,27 @@ func (r *Repository) SelectQuery(query string) string {
 	return query
 }
 
-func (r *Repository) CreateUser(ctx context.Context, data User) error {
-	query := `INSERT INTO user (name, email, password_hash) VALUES (?, ?, ?)`
-	_, err := r.db.ExecContext(ctx, query, data.Name, data.Email, data.PasswordHash)
-	if err != nil {
-		return err
+func (r *Repository) paginationQuery(query string, param PaginationParam) string {
+	limit := param.Size
+	offset := (param.Page - 1) * param.Size
+
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
 	}
-	return err
+	if offset > 0 {
+		query += fmt.Sprintf(" OFFSET %d", offset)
+	}
+	return query
+}
+
+func (r *Repository) Count(ctx context.Context, query string, args ...any) int {
+	query = strings.Replace(query, " * ", " COUNT(*) ", 1)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return 0
+	}
+
+	var total int
+	dbscan.ScanOne(&total, rows)
+	return total
 }

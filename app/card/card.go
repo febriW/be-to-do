@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("not found")
-	ErrNotAuthorized = errors.New("not authorized")
-	ErrCantUpdate    = errors.New("can't update data that's already marked")
+	ErrNotFound   = errors.New("not found")
+	ErrCantUpdate = errors.New("can't update data that's already marked")
+	ErrCantDelete = errors.New("can't delete data")
 )
 
 type Card struct {
@@ -66,11 +66,51 @@ func NewService(db *sql.DB) *Service {
 	return &Service{db: db}
 }
 
-//func (s *Service) DeleteCard(ctx context.Context, AuthorID string, ActivitiesNO string) error {
-//	err := s.execTx(ctx, func(r *repository.Repository) error {
-//
-//	})
-//}
+func (s *Service) HandleDeleteCard() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			AuthorID     int    `json:"author_id"`
+			ActivitiesNo string `json:"activities_no"`
+		}
+		err := json.NewDecoder(r.Body).Decode(&input)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+		err = s.DeleteCard(r.Context(), input.AuthorID, input.ActivitiesNo)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Service) DeleteCard(ctx context.Context, AuthorID int, ActivitiesNo string) error {
+	err := s.execTx(ctx, func(r *repository.Repository) error {
+		if AuthorID <= 0 {
+			return fmt.Errorf("card with author id %s %w", strconv.Itoa(AuthorID), ErrNotFound)
+		}
+
+		if ActivitiesNo == "" {
+			return fmt.Errorf("Card activities no %s %w", ActivitiesNo, ErrNotFound)
+		}
+
+		c := r.CheckCard(ctx, ActivitiesNo, AuthorID)
+		if c == nil {
+			return fmt.Errorf("card %s from author id %v %w", ActivitiesNo, AuthorID, ErrNotFound)
+		}
+		if c.Marked != nil {
+			return fmt.Errorf("Card number %s %w because already marked", ActivitiesNo, ErrCantDelete)
+		}
+
+		return r.DeleteCard(ctx, ActivitiesNo, AuthorID)
+
+	})
+
+	return err
+}
 
 func (s *Service) UpdateCard(ctx context.Context, params CardParamUpdate) error {
 	err := s.execTx(ctx, func(r *repository.Repository) error {
@@ -296,6 +336,13 @@ func mapCardRepoToService(data repository.Card) Card {
 		deletedAt = "" // or handle as needed
 	}
 
+	var markedStatus string
+	if data.MarkedStatus != nil && *data.MarkedStatus != "" {
+		markedStatus = *data.MarkedStatus
+	} else {
+		markedStatus = ""
+	}
+
 	return Card{
 		ActivitiesNo: data.ActivitiesNo,
 		Title:        data.Title,
@@ -304,5 +351,6 @@ func mapCardRepoToService(data repository.Card) Card {
 		UpdatedAt:    data.UpdatedAt.Format(time.DateTime),
 		DeletedAt:    deletedAt,
 		Marked:       marked,
+		MarkedStatus: markedStatus,
 	}
 }

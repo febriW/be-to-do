@@ -105,7 +105,7 @@ func (r *Repository) CheckCard(ctx context.Context, activitiesNo string, authorI
 }
 
 func (r *Repository) DeleteCard(ctx context.Context, ActivitiesNo string, AuthorID int) error {
-	query := "UPDATE card SET deleted_at = ? WHERE activities_no = AND authod_id = ?"
+	query := "UPDATE card SET deleted_at = ? WHERE activities_no = ? AND author_id = ?"
 	_, err := r.db.ExecContext(ctx, query, time.Now(), ActivitiesNo, AuthorID)
 	return err
 }
@@ -147,7 +147,7 @@ func (r *Repository) GetCards(ctx context.Context, param CardsParam) ([]Card, in
 	var args []any
 
 	if param.AuthorID > 0 {
-		query += " WHERE author_id = ?"
+		query += " WHERE author_id = ? AND deleted_at IS NULL"
 		args = append(args, param.AuthorID)
 	}
 
@@ -166,7 +166,7 @@ func (r *Repository) GetCards(ctx context.Context, param CardsParam) ([]Card, in
 		fmt.Printf("Scan Error: %v\n", scanErr)
 		return nil, 0
 	}
-	fmt.Printf("Results: %+v\n", res)
+
 	return res, total
 }
 

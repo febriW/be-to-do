@@ -32,6 +32,7 @@ func main() {
 	mux.HandleFunc("GET /card", user.TokenMiddleware(cardService.HandleGetAllCards()))
 	mux.HandleFunc("POST /card", user.TokenMiddleware(cardService.HandleCreateCard()))
 	mux.HandleFunc("PUT /card", user.TokenMiddleware(cardService.HandleUpdateCard()))
+	mux.HandleFunc("DELETE /card", user.TokenMiddleware(cardService.HandleDeleteCard()))
 
 	srv := &http.Server{
 		Handler:      mux,

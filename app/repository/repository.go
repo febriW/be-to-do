@@ -58,7 +58,7 @@ func New(db DB) *Repository {
 func (r *Repository) CheckUser(ctx context.Context, email string) *User {
 	query := r.SelectQuery(`SELECT * FROM user WHERE email = ? LIMIT 1`)
 	rows, err := r.db.QueryContext(ctx, query, email)
-	fmt.Println(err)
+
 	if err != nil {
 		slog.Error("failed to query user", "email", email, "err", err)
 		return nil
@@ -84,6 +84,31 @@ func (r *Repository) CreateUser(ctx context.Context, data User) error {
 }
 
 // card repository
+func (r *Repository) CheckCard(ctx context.Context, activitiesNo string) *User {
+	query := r.SelectQuery(`SELECT * FROM card WHERE activities_no = ? LIMIT 1`)
+	rows, err := r.db.QueryContext(ctx, query, activitiesNo)
+
+	if err != nil {
+		slog.Error("failed to query card", "activities_no", activitiesNo, "err", err)
+		return nil
+	}
+
+	var res User
+	err = dbscan.ScanOne(&res, rows)
+	if err != nil {
+		slog.Error("failed to scan card", "activities_no", activitiesNo, "err", err)
+		return nil
+	}
+
+	return &res
+}
+
+func (r *Repository) UpdateCard(ctx context.Context, data Card) error {
+	query := "UPDATE card SET title = ?, content = ?, marked =? , WHERE activities_no = ? AND author_id = ?"
+	_, err := r.db.ExecContext(ctx, query, data.Title, data.Content, data.Marked, data.ActivitiesNo, data.AuthorID)
+	return err
+}
+
 func (r *Repository) CreateCard(ctx context.Context, data Card) error {
 	selectQuery := r.SelectQuery("SELECT * FROM card")
 	latestActivities := r.Count(ctx, selectQuery)

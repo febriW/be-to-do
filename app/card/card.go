@@ -23,17 +23,17 @@ type Card struct {
 	Title        string `json:"title"`
 	Content      string `json:"content"`
 	AuthorId     int    `json:"author_id"`
-	Marked       time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    time.Time
+	Marked       string `json:"marked"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+	DeletedAt    string `json:"deleted_at"`
 }
 
 type CardParamCreate struct {
-	AuthorID int       `json:"author_id"`
-	Title    string    `json:"title"`
-	Content  string    `json:"content"`
-	Marked   time.Time `json:"marked"`
+	AuthorID int    `json:"author_id"`
+	Title    string `json:"title"`
+	Content  string `json:"content"`
+	Marked   string `json:"marked"`
 }
 
 type CardsParam struct {
@@ -59,11 +59,22 @@ func (s *Service) CreateCard(ctx context.Context, params CardParamCreate) error 
 		if params.AuthorID <= 0 {
 			return fmt.Errorf("author id %s %w", strconv.Itoa(params.AuthorID), ErrNotFound)
 		}
+		var markedTime *time.Time
+		if params.Marked != "" {
+			parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", params.Marked)
+			if parseErr != nil {
+				return fmt.Errorf("invalid date format for Marked: %w", parseErr)
+			}
+			markedTime = &parsedTime
+		} else {
+			markedTime = nil
+		}
+
 		return r.CreateCard(ctx, repository.Card{
 			AuthorID: params.AuthorID,
 			Title:    params.Title,
 			Content:  params.Content,
-			Marked:   params.Marked,
+			Marked:   markedTime,
 		})
 	})
 
@@ -97,8 +108,7 @@ func (s *Service) GetAllCards(ctx context.Context, param CardsParam) ([]Card, in
 	repoParam.Page = param.Page
 	repoParam.Size = param.Size
 	cs, total := repo.GetCards(ctx, repoParam)
-
-	res := make([]Card, len(cs))
+	res := make([]Card, 0, len(cs))
 	for _, c := range cs {
 		res = append(res, mapCardRepoToService(c))
 	}
@@ -186,13 +196,27 @@ func (s *Service) execTx(ctx context.Context, fn func(*repository.Repository) er
 }
 
 func mapCardRepoToService(data repository.Card) Card {
+	var marked string
+	if data.Marked != nil {
+		marked = data.Marked.Format("2006-01-02 15:04:05")
+	} else {
+		marked = ""
+	}
+
+	var deletedAt string
+	if data.DeletedAt != nil {
+		deletedAt = data.DeletedAt.Format("2006-01-02 15:04:05")
+	} else {
+		deletedAt = "" // or handle as needed
+	}
+
 	return Card{
 		ActivitiesNo: data.ActivitiesNo,
 		Title:        data.Title,
 		Content:      data.Content,
-		CreatedAt:    data.CreatedAt,
-		UpdatedAt:    data.UpdatedAt,
-		DeletedAt:    data.DeletedAt,
-		Marked:       data.Marked,
+		CreatedAt:    data.CreatedAt.Format(time.DateTime),
+		UpdatedAt:    data.UpdatedAt.Format(time.DateTime),
+		DeletedAt:    deletedAt,
+		Marked:       marked,
 	}
 }

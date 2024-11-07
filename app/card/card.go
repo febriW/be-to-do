@@ -36,6 +36,14 @@ type CardParamCreate struct {
 	Marked   string `json:"marked"`
 }
 
+type CardParamUpdate struct {
+	AuthorID     int    `json:"author_id"`
+	Title        string `json:"title"`
+	Content      string `json:"content"`
+	Marked       string `json:"marked"`
+	ActivitiesNo string `json:"activities_no"`
+}
+
 type CardsParam struct {
 	AuthorID int
 	PaginationParam
@@ -52,6 +60,64 @@ type Service struct {
 
 func NewService(db *sql.DB) *Service {
 	return &Service{db: db}
+}
+
+func (s *Service) UpdateCard(ctx context.Context, params CardParamUpdate) error {
+	err := s.execTx(ctx, func(r *repository.Repository) error {
+		if params.AuthorID <= 0 {
+			return fmt.Errorf("author id %s %w", strconv.Itoa(params.AuthorID), ErrNotFound)
+		}
+
+		if params.ActivitiesNo == "" {
+			return fmt.Errorf("Card activities no %s %w", params.ActivitiesNo, ErrNotFound)
+		}
+
+		c := r.CheckCard(ctx, params.ActivitiesNo)
+		if c == nil {
+			return fmt.Errorf("card %s %w", params.ActivitiesNo, ErrNotFound)
+		}
+
+		var markedTime *time.Time
+		if params.Marked != "" {
+			parsedTime, parseErr := time.Parse("2006-01-02 15:04:05", params.Marked)
+			if parseErr != nil {
+				return fmt.Errorf("invalid date format for Marked: %w", parseErr)
+			}
+			markedTime = &parsedTime
+		} else {
+			markedTime = nil
+		}
+
+		return r.UpdateCard(ctx, repository.Card{
+			ActivitiesNo: params.ActivitiesNo,
+			AuthorID:     params.AuthorID,
+			Title:        params.Title,
+			Content:      params.Content,
+			Marked:       markedTime,
+		})
+	})
+
+	return err
+}
+
+func (s *Service) HandleUpdateCard() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var params CardParamUpdate
+
+		err := json.NewDecoder(r.Body).Decode(&params)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		err = s.UpdateCard(r.Context(), params)
+		if err != nil {
+			server.ErrorResponse(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func (s *Service) CreateCard(ctx context.Context, params CardParamCreate) error {

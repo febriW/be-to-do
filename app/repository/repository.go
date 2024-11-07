@@ -30,14 +30,14 @@ type User struct {
 }
 
 type Card struct {
-	ActivitiesNo string `json:"activities_no"`
-	Title        string `json:"title"`
-	Content      string `json:"content"`
-	AuthorID     int    `json:"author_id"`
-	Marked       time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    time.Time
+	ActivitiesNo string     `json:"activities_no"`
+	Title        string     `json:"title"`
+	Content      string     `json:"content"`
+	AuthorID     int        `json:"author_id"`
+	Marked       *time.Time `json:"marked"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	DeletedAt    *time.Time `json:"deleted_at"`
 }
 
 type CardsParam struct {
@@ -93,8 +93,8 @@ func (r *Repository) CreateCard(ctx context.Context, data Card) error {
 		latestActivities += 1
 	}
 	activitiesNo := fmt.Sprintf("AC-%04d", latestActivities)
-	query := `INSERT INTO card (activities_no, author_id, title, content) VALUES (?,?,?,?)`
-	_, err := r.db.ExecContext(ctx, query, activitiesNo, data.AuthorID, data.Title, data.Content)
+	query := `INSERT INTO card (activities_no, author_id, title, content, marked) VALUES (?,?,?,?,?)`
+	_, err := r.db.ExecContext(ctx, query, activitiesNo, data.AuthorID, data.Title, data.Content, data.Marked)
 	if err != nil {
 		return err
 	}
@@ -122,11 +122,18 @@ func (r *Repository) GetCards(ctx context.Context, param CardsParam) ([]Card, in
 	query = r.paginationQuery(query, param.PaginationParams)
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
+		fmt.Printf("Query Error: %v\n", err)
 		return nil, 0
 	}
+	defer rows.Close()
 
 	var res []Card
-	dbscan.ScanAll(&res, rows)
+	scanErr := dbscan.ScanAll(&res, rows)
+	if scanErr != nil {
+		fmt.Printf("Scan Error: %v\n", scanErr)
+		return nil, 0
+	}
+	fmt.Printf("Results: %+v\n", res)
 	return res, total
 }
 

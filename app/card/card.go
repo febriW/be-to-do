@@ -28,7 +28,7 @@ type Card struct {
 	Marked       string `json:"marked"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
-	DeletedAt    string `json:"deleted_at"`
+	//DeletedAt    string `json:"deleted_at"`
 }
 
 type CardParamCreate struct {
@@ -329,13 +329,6 @@ func mapCardRepoToService(data repository.Card) Card {
 		marked = ""
 	}
 
-	var deletedAt string
-	if data.DeletedAt != nil {
-		deletedAt = data.DeletedAt.Format("2006-01-02 15:04:05")
-	} else {
-		deletedAt = "" // or handle as needed
-	}
-
 	var markedStatus string
 	if data.MarkedStatus != nil && *data.MarkedStatus != "" {
 		markedStatus = *data.MarkedStatus
@@ -349,7 +342,6 @@ func mapCardRepoToService(data repository.Card) Card {
 		Content:      data.Content,
 		CreatedAt:    data.CreatedAt.Format(time.DateTime),
 		UpdatedAt:    data.UpdatedAt.Format(time.DateTime),
-		DeletedAt:    deletedAt,
 		Marked:       marked,
 		MarkedStatus: markedStatus,
 	}

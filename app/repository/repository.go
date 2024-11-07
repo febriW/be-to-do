@@ -84,7 +84,7 @@ func (r *Repository) CreateUser(ctx context.Context, data User) error {
 }
 
 // card repository
-func (r *Repository) CheckCard(ctx context.Context, activitiesNo string) *User {
+func (r *Repository) CheckCard(ctx context.Context, activitiesNo string) *Card {
 	query := r.SelectQuery(`SELECT * FROM card WHERE activities_no = ? LIMIT 1`)
 	rows, err := r.db.QueryContext(ctx, query, activitiesNo)
 
@@ -93,10 +93,10 @@ func (r *Repository) CheckCard(ctx context.Context, activitiesNo string) *User {
 		return nil
 	}
 
-	var res User
+	var res Card
 	err = dbscan.ScanOne(&res, rows)
 	if err != nil {
-		slog.Error("failed to scan card", "activities_no", activitiesNo, "err", err)
+		slog.Error("failed to scan card", "activities_no ", activitiesNo, "err", err)
 		return nil
 	}
 
@@ -104,7 +104,7 @@ func (r *Repository) CheckCard(ctx context.Context, activitiesNo string) *User {
 }
 
 func (r *Repository) UpdateCard(ctx context.Context, data Card) error {
-	query := "UPDATE card SET title = ?, content = ?, marked =? , WHERE activities_no = ? AND author_id = ?"
+	query := "UPDATE card SET title = ?, content = ?, marked =? WHERE activities_no = ? AND author_id = ?"
 	_, err := r.db.ExecContext(ctx, query, data.Title, data.Content, data.Marked, data.ActivitiesNo, data.AuthorID)
 	return err
 }

@@ -254,8 +254,6 @@ func (s *Service) HandleGetAllCards() func(http.ResponseWriter, *http.Request) {
 
 		cs, total := s.GetAllCards(r.Context(), params)
 		output := struct {
-			Next  string
-			Prev  string
 			Total int
 			Data  []Card
 		}{

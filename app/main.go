@@ -60,7 +60,7 @@ func main() {
 }
 
 func initDB() *sql.DB {
-	db, err := sql.Open("mysql", "root:abc123@tcp(127.0.0.1:3307)/appdb?parseTime=true&loc=Asia%2FJakarta")
+	db, err := sql.Open("mysql", "root:abc123@tcp(db:3306)/appdb?parseTime=true&loc=Asia%2FJakarta")
 	if err != nil {
 		panic(err)
 	}

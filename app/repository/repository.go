@@ -35,6 +35,7 @@ type Card struct {
 	Content      string     `json:"content"`
 	AuthorID     int        `json:"author_id"`
 	Marked       *time.Time `json:"marked"`
+	MarkedStatus *string    `json:"marked_status"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 	DeletedAt    *time.Time `json:"deleted_at"`
@@ -84,9 +85,9 @@ func (r *Repository) CreateUser(ctx context.Context, data User) error {
 }
 
 // card repository
-func (r *Repository) CheckCard(ctx context.Context, activitiesNo string) *Card {
-	query := r.SelectQuery(`SELECT * FROM card WHERE activities_no = ? LIMIT 1`)
-	rows, err := r.db.QueryContext(ctx, query, activitiesNo)
+func (r *Repository) CheckCard(ctx context.Context, activitiesNo string, authorID int) *Card {
+	query := r.SelectQuery(`SELECT * FROM card WHERE activities_no = ? AND author_id = ? LIMIT 1`)
+	rows, err := r.db.QueryContext(ctx, query, activitiesNo, authorID)
 
 	if err != nil {
 		slog.Error("failed to query card", "activities_no", activitiesNo, "err", err)
@@ -103,9 +104,16 @@ func (r *Repository) CheckCard(ctx context.Context, activitiesNo string) *Card {
 	return &res
 }
 
+func (r *Repository) DeleteCard(ctx context.Context, ActivitiesNo string, AuthorID int) error {
+	query := "UPDATE card SET deleted_at = ? WHERE activities_no = AND authod_id = ?"
+	_, err := r.db.ExecContext(ctx, query, time.Now(), ActivitiesNo, AuthorID)
+	return err
+}
+
 func (r *Repository) UpdateCard(ctx context.Context, data Card) error {
-	query := "UPDATE card SET title = ?, content = ?, marked =? WHERE activities_no = ? AND author_id = ?"
-	_, err := r.db.ExecContext(ctx, query, data.Title, data.Content, data.Marked, data.ActivitiesNo, data.AuthorID)
+	fmt.Printf("data on update card repo: %s", data)
+	query := "UPDATE card SET title = ?, content = ?, marked = ?, marked_status = ? WHERE activities_no = ? AND author_id = ?"
+	_, err := r.db.ExecContext(ctx, query, data.Title, data.Content, data.Marked, data.MarkedStatus, data.ActivitiesNo, data.AuthorID)
 	return err
 }
 

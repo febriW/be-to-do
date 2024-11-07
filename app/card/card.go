@@ -16,6 +16,7 @@ import (
 var (
 	ErrNotFound      = errors.New("not found")
 	ErrNotAuthorized = errors.New("not authorized")
+	ErrCantUpdate    = errors.New("can't update data that's already marked")
 )
 
 type Card struct {
@@ -23,6 +24,7 @@ type Card struct {
 	Title        string `json:"title"`
 	Content      string `json:"content"`
 	AuthorId     int    `json:"author_id"`
+	MarkedStatus string `json:"marked_status"`
 	Marked       string `json:"marked"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
@@ -30,16 +32,18 @@ type Card struct {
 }
 
 type CardParamCreate struct {
-	AuthorID int    `json:"author_id"`
-	Title    string `json:"title"`
-	Content  string `json:"content"`
-	Marked   string `json:"marked"`
+	AuthorID     int    `json:"author_id"`
+	Title        string `json:"title"`
+	Content      string `json:"content"`
+	MarkedStatus string `json:"marked_status"`
+	Marked       string `json:"marked"`
 }
 
 type CardParamUpdate struct {
 	AuthorID     int    `json:"author_id"`
 	Title        string `json:"title"`
 	Content      string `json:"content"`
+	MarkedStatus string `json:"marked_status"`
 	Marked       string `json:"marked"`
 	ActivitiesNo string `json:"activities_no"`
 }
@@ -62,19 +66,29 @@ func NewService(db *sql.DB) *Service {
 	return &Service{db: db}
 }
 
+//func (s *Service) DeleteCard(ctx context.Context, AuthorID string, ActivitiesNO string) error {
+//	err := s.execTx(ctx, func(r *repository.Repository) error {
+//
+//	})
+//}
+
 func (s *Service) UpdateCard(ctx context.Context, params CardParamUpdate) error {
 	err := s.execTx(ctx, func(r *repository.Repository) error {
 		if params.AuthorID <= 0 {
-			return fmt.Errorf("author id %s %w", strconv.Itoa(params.AuthorID), ErrNotFound)
+			return fmt.Errorf("card with author id %s %w", strconv.Itoa(params.AuthorID), ErrNotFound)
 		}
 
 		if params.ActivitiesNo == "" {
 			return fmt.Errorf("Card activities no %s %w", params.ActivitiesNo, ErrNotFound)
 		}
 
-		c := r.CheckCard(ctx, params.ActivitiesNo)
+		c := r.CheckCard(ctx, params.ActivitiesNo, params.AuthorID)
 		if c == nil {
-			return fmt.Errorf("card %s %w", params.ActivitiesNo, ErrNotFound)
+			return fmt.Errorf("card %s from author id %v %w", params.ActivitiesNo, params.AuthorID, ErrNotFound)
+		}
+
+		if c.Marked != nil {
+			return fmt.Errorf("Card number %s %w", params.ActivitiesNo, ErrCantUpdate)
 		}
 
 		var markedTime *time.Time
@@ -88,12 +102,20 @@ func (s *Service) UpdateCard(ctx context.Context, params CardParamUpdate) error 
 			markedTime = nil
 		}
 
+		var markedStatus *string
+		if params.MarkedStatus != "" {
+			markedStatus = &params.MarkedStatus
+		} else {
+			markedStatus = nil
+		}
+
 		return r.UpdateCard(ctx, repository.Card{
 			ActivitiesNo: params.ActivitiesNo,
 			AuthorID:     params.AuthorID,
 			Title:        params.Title,
 			Content:      params.Content,
 			Marked:       markedTime,
+			MarkedStatus: markedStatus,
 		})
 	})
 

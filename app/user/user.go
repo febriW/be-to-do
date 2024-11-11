@@ -79,19 +79,20 @@ func (s *Service) HandleRegister() func(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (string, error) {
+func (s *Service) Login(ctx context.Context, email, password string) (int, string, error) {
 	repo := repository.New(s.db)
 	u := repo.CheckUser(ctx, email)
 	if u == nil {
-		return "", fmt.Errorf("user with email %s: %w", email, ErrNotFound)
+		return 0, "", fmt.Errorf("user with email %s: %w", email, ErrNotFound)
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
-		return "", fmt.Errorf("user password not match: %w", ErrInvalidLogin)
+		return 0, "", fmt.Errorf("user password not match: %w", ErrInvalidLogin)
 	}
 
+	authorID := u.ID
 	token := session.Create(u.ID)
-	return token, nil
+	return authorID, token, nil
 }
 
 func (s *Service) HandleLogin() func(w http.ResponseWriter, r *http.Request) {
@@ -107,16 +108,18 @@ func (s *Service) HandleLogin() func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		token, err := s.Login(r.Context(), input.Email, input.Password)
+		authorID, token, err := s.Login(r.Context(), input.Email, input.Password)
 		if err != nil {
 			server.ErrorResponse(w, http.StatusUnprocessableEntity, err)
 			return
 		}
 
 		output := struct {
-			Token string `json:"token"`
+			AuthorID int    `json:"author_id"`
+			Token    string `json:"token"`
 		}{
-			Token: token,
+			AuthorID: authorID,
+			Token:    token,
 		}
 
 		server.JSONResponse(w, http.StatusOK, output)

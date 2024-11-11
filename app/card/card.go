@@ -8,15 +8,17 @@ import (
 	"fmt"
 	"github.com/febriW/be-to-do/repository"
 	"github.com/febriW/be-to-do/server"
+	"github.com/febriW/be-to-do/user"
 	"net/http"
 	"strconv"
 	"time"
 )
 
 var (
-	ErrNotFound   = errors.New("not found")
-	ErrCantUpdate = errors.New("can't update data that's already marked")
-	ErrCantDelete = errors.New("can't delete data")
+	ErrNotFound      = errors.New("not found")
+	ErrNotAuthorized = errors.New("not authorized")
+	ErrCantUpdate    = errors.New("can't update data that's already marked")
+	ErrCantDelete    = errors.New("can't delete data")
 )
 
 type Card struct {
@@ -28,7 +30,6 @@ type Card struct {
 	Marked       string `json:"marked"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
-	//DeletedAt    string `json:"deleted_at"`
 }
 
 type CardParamCreate struct {
@@ -68,22 +69,23 @@ func NewService(db *sql.DB) *Service {
 
 func (s *Service) HandleDeleteCard() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var input struct {
-			AuthorID     int    `json:"author_id"`
-			ActivitiesNo string `json:"activities_no"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&input)
+		id := r.PathValue("id")
+		AuthorID := user.IDFromContext(r.Context())
+
+		err := s.DeleteCard(r.Context(), AuthorID, id)
 		if err != nil {
-			server.ErrorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-		err = s.DeleteCard(r.Context(), input.AuthorID, input.ActivitiesNo)
-		if err != nil {
-			server.ErrorResponse(w, http.StatusUnprocessableEntity, err)
+			status := http.StatusInternalServerError
+			switch {
+			case errors.Is(err, ErrNotAuthorized):
+				status = http.StatusForbidden
+			case errors.Is(err, ErrNotFound):
+				status = http.StatusNotFound
+			}
+			server.ErrorResponse(w, status, err)
 			return
 		}
 
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -338,6 +340,7 @@ func mapCardRepoToService(data repository.Card) Card {
 
 	return Card{
 		ActivitiesNo: data.ActivitiesNo,
+		AuthorId:     data.AuthorID,
 		Title:        data.Title,
 		Content:      data.Content,
 		CreatedAt:    data.CreatedAt.Format(time.DateTime),

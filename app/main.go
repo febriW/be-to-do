@@ -19,6 +19,24 @@ func NotImplemented(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%s %s", r.Method, r.URL.String()+" Not Exist")
 }
 
+func enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Allow all origins for development. Change "*" to your frontend URL in production.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		// Handle preflight OPTIONS request
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	db := initDB()
 	userService := user.NewService(db)
@@ -32,10 +50,12 @@ func main() {
 	mux.HandleFunc("GET /card", user.TokenMiddleware(cardService.HandleGetAllCards()))
 	mux.HandleFunc("POST /card", user.TokenMiddleware(cardService.HandleCreateCard()))
 	mux.HandleFunc("PUT /card", user.TokenMiddleware(cardService.HandleUpdateCard()))
-	mux.HandleFunc("DELETE /card", user.TokenMiddleware(cardService.HandleDeleteCard()))
+	mux.HandleFunc("DELETE /card/{id}", user.TokenMiddleware(cardService.HandleDeleteCard()))
+
+	handler := enableCORS(mux)
 
 	srv := &http.Server{
-		Handler:      mux,
+		Handler:      handler,
 		Addr:         ":8080",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
